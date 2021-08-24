@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <title>Linear System Solver</title>
+    </head>
+    <body>
+<h3>Type your equations here</h3>
+
+<textarea id="equ_input" cols="50" rows="10"></textarea>
+<br>
+<button onclick="Submit()">Solve</button>
+<p id="output"></p>
+<script>
+//100=2 decimal places, 1000 = 3 decimal places ect
+var DECI_PRECISION = 100;
+
+
+function Submit() {
+    console.log("Submit ---------------------");
+    
+    var input = document.getElementById("equ_input").value;
+  
+    let invalidRegex = /[^0-9.A-Za-z_+\-=\s]|^[^=\n]+$|[A-Za-z]\h*[A-Za-z]|[\-_]\h*[=+\-_]|=\h*[=+_]|^(=.*){2,}?$|^(.*=.*){2,}?$|^(.*=\h*\-?\h*[^0-9.A-Za-z])$|^(\h*-?\h*[^0-9.A-Za-z]\h*=.*)$|^=.*$|_[A-Za-z]|[0-9.]_|_[0-9]+[A-Za-z]|[A-Za-z]\h*[0-9.]|_[^0-9.]|\.[^0-9]|\+\h*[=+_]/m;
+  
+    if(invalidRegex.test(input)||input==""){
+        document.getElementById("output").style.color = "#FF0000";
+        document.getElementById("output").innerHTML = "Invalid Input";
+    }else{
+        var output = Pharse(input);
+        if(output==-1){
+            document.getElementById("output").style.color = "#FF0000";
+            document.getElementById("output").innerHTML = "System has no solutions.";
+        }else{
+            output=output.join("<br />");
+            document.getElementById("output").style.color = "#000000";
+            document.getElementById("output").innerHTML = output;
+        }
+    }
+}
+
+function onlyUnique(value, index, self) {
+    return self.indexOf(value) === index;
+}
+function notEmpty(value) {
+    return value != "";
+}
+
+function aryNotEmpty(ary) {
+    return !ary.every(isEmpty);
+}
+
+function isEmpty(value) {
+    return (value === 0)||(value!=value)||(value===null);
+}
+
+function Pharse(input) {
+    
+    let getVarsRegex = /([A-Za-z](_[0-9.]+)*)/g;
+    
+    //uses this so it can be passed to subPhrase
+    this.varArry = input.match(getVarsRegex).filter(onlyUnique);
+    console.log(this.varArry);
+    
+    var equationsArry = input.split('\n').filter(notEmpty);
+    //Run subPhrase
+    equationsArry.forEach(subPharse, this);
+    
+    console.log('equationsArry');
+    console.log(JSON.parse(JSON.stringify(equationsArry)));
+    
+    //remove empty equations (0=0)
+    equationsArry=equationsArry.filter(aryNotEmpty);
+    
+    //Return Error if there is a contradiction
+    for(var i=0;i<equationsArry.length;i++){
+        if(equationsArry[i].slice(0,-1).every(isEmpty)){
+            return -1;
+        }
+    }
+    
+    equationsArry=reduceArry(equationsArry);
+    
+    //Return Error if there is a contradiction after reducing
+    for(var i=0;i<equationsArry.length;i++){
+        if(equationsArry[i].slice(0,-1).every(isEmpty)){
+            return -1;
+        }
+    }
+    
+    console.log(equationsArry);
+    
+    return formatOutput(equationsArry,this.varArry);
+    
+}
+
+/*var sum = array1.map(function (num, index) {
+  return num + array2[index];
+}); */
+
+
+
+
+function multArry(scaler){
+    return function(num){
+        return num*scaler;
+    }
+}
+
+function sumArry(total,value){
+    return parseFloat(total)+parseFloat(value);
+}
+
+function subPharse(equation,index,array) {
+    
+    //remove whitespace
+    equation=equation.replace(/\s+/g, '');
+    //Add a 1 before the single vars to let the other RegEx phrase it properly
+    equation=equation.replace(/(?<![0-9])([A-Za-z](_[0-9.]*)*)/g, '1$1');
+    
+
+    console.log(equation);
+    
+    //spit at equals
+    let Eq = equation.split('=');
+    let leftEq = Eq[0];
+    let rightEq = Eq[1];
+    let EqConst = 0;
+    
+    
+    var constRegex = /(((?<!_|[0-9.])|-+)[0-9.]+(?!\t*[0-9.]*[A-Za-z]))/g;
+    
+    
+    //console.log(rightEq);
+    let rightEqConsts = rightEq.match(constRegex);
+    //console.log(rightEqConsts);
+    if(rightEqConsts != null){
+        EqConst += parseFloat(rightEqConsts.reduce(sumArry));
+    }
+    
+    //console.log(leftEq);
+    let leftEqConsts = leftEq.match(constRegex);
+    //console.log(leftEqConsts);
+    if(leftEqConsts != null){
+        EqConst -= parseFloat(leftEqConsts.reduce(sumArry));
+    }
+    
+    //Loop through all the variables to move them to the left
+    var varCountArry = new Array(this.varArry.length);
+    for(var i=0; i<this.varArry.length; i++){
+        var varRegex = new RegExp('-*[0-9.]+(?='+this.varArry[i]+')(?!'+this.varArry[i]+'_)','g');
+        
+        var EqVar = 0;
+        
+        var rightEqVars = rightEq.match(varRegex);
+        if(rightEqVars != null){
+            EqVar -= parseFloat(rightEqVars.reduce(sumArry));
+        }
+        var leftEqVars = leftEq.match(varRegex);
+        if(leftEqVars != null){
+            EqVar += parseFloat(leftEqVars.reduce(sumArry));
+        }
+        
+        varCountArry[i]=EqVar;
+        
+    }
+    
+
+    console.log("varCountArry");
+    console.log(varCountArry);
+    
+    console.log(EqConst);
+    
+    varCountArry.push(EqConst)
+    
+    array[index]=varCountArry
+    
+    console.log(array[index]);
+    
+}
+
+function reduceArry(arry) {
+
+    
+    ForwrdElim(arry,0);
+
+    //scale pivots
+    for(var i=0; i<arry.length; i++){
+        var indx = -1;
+        for(var j=0; j<arry[0].length-1; j++){
+            if(arry[i][j]!=0){
+                indx=j;
+                break;
+            }
+        }
+        if(arry[i][indx]!=1&&indx!=-1){
+            arry[i] = arry[i].map(multArry(1/arry[i][indx]));
+        }
+    }
+    
+    //Mnipulate vals above pivots to zero
+    upNegate(arry,arry.length-1);
+    
+    return arry;
+    
+}
+
+function ForwrdElim(arry,pvot_col,offset) {
+    //optional param
+     offset = typeof offset !== 'undefined' ? offset : 0;
+    
+    console.log(pvot_col);
+    console.log(offset);
+    
+    //Find pivot
+    var pvot_row=-1
+    for(var i=pvot_col-offset;i<arry.length;i++){
+        if(arry[i][pvot_col]!=0){
+            pvot_row=i;
+            break;
+        }
+    }
+    //Move pivot to first row
+    if(pvot_row>pvot_col-offset){
+        var arrySwtch=arry[pvot_col-offset];
+        arry[pvot_col-offset]=arry[pvot_row];
+        arry[pvot_row]=arrySwtch;
+    }
+    
+    //-1 if all zeros
+    if (pvot_row!=-1){
+        for(var i=pvot_col+1-offset;i<arry.length;i++){
+            if(arry[i][pvot_col]!=0){
+                // Find what added to the row will make the pivot column zero
+                var prodAry =arry[pvot_col].map(multArry(-(arry[i][pvot_col]/arry[pvot_col][pvot_col])));
+                //console.log(prodAry);
+                // Add it to the current row
+                arry[i] = arry[i].map(function (num, index) {
+                    return num + prodAry[index];
+                });   
+            }
+        }
+        
+    }else{
+        offset+=1;
+    }
+    
+
+    
+    
+    if(pvot_col+2<arry[0].length){
+        ForwrdElim(arry,pvot_col+1,offset);
+    }
+}
+
+function upNegate(matrx,row){
+    //find pivot
+    var col = -1;
+    for(var j=0; j<matrx[0].length-1; j++){
+        if(matrx[row][j]==1){
+            col=j;
+            break;
+        }
+    }
+    //if pivot exists manip vals above to 0
+    if(col!=-1){
+        for(var i=row-1;i>=0;i--){
+            
+            if(matrx[i][col]!=0){
+                
+                // Find what added to the row will make the pivot column zero
+                var prodAry = matrx[row].map(multArry(-matrx[i][col]));
+                
+                // Add it to the current row
+                matrx[i] = matrx[i].map(function (num, index) {
+                    return num + prodAry[index];
+                });   
+                
+            }
+            
+        }
+    }else{
+        console.log(matrx[row]);
+        if(matrx[row].every(isEmpty)){
+            matrx.splice(row,1);
+        }
+    }
+    
+    if(row>0){
+        upNegate(matrx,row-1);
+    }
+}
+
+function formatOutput(input,varNames){
+    var output = new Array(input[0].length-1);
+    
+    for(var i=0; i<input.length; i++){
+        //find pivot
+        var col = -1;
+        for(var j=0; j<input[0].length-1; j++){
+            if(input[i][j]==1){
+                col=j;
+                break;
+            }
+        }
+        
+        var out_str ="";
+        
+        out_str+=varNames[col]+'=';
+        
+        var isFirst = true;
+        for(var j=col+1; j<input[0].length-1; j++){
+            if(input[i][j]!=0){
+                if(!isFirst){
+                    out_str+='+';
+                }
+                if(input[i][j]==1){
+                    out_str+='-'+varNames[j];
+                }else if(input[i][j]==-1){
+                    out_str+=varNames[j];
+                }else{
+                    out_str+=-(Math.round(input[i][j] * DECI_PRECISION) / DECI_PRECISION)+varNames[j];
+                }
+                isFirst=false;
+            }
+        }
+        var constant = (Math.round(input[i][input[i].length-1] * DECI_PRECISION) / DECI_PRECISION);
+        if(!isFirst&&constant!=0){
+            out_str+='+';
+            out_str+=constant;
+        }else if(isFirst){
+            out_str+=constant;
+        }
+        
+        //replace +- with -
+        out_str=out_str.replace(/\+-/g, '-');
+        
+        
+        console.log(out_str);
+        
+        output[col]=out_str;
+        
+        }
+        
+        //add output for variables that can be anything
+        for(var i=0;i<output.length;i++){
+            if(output[i]==undefined){
+                output[i]=varNames[i]+'='+varNames[i];
+            }
+        }
+        
+        
+    console.log(output);
+    
+    return output;
+}
+
+
+
+</script>
+
+
+
+    </body>
+</html>
